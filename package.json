@@ -1,0 +1,17 @@
+{
+  "name": "flagdeck",
+  "version": "0.1.0",
+  "description": "Terminal dashboard, promote/diff CLI and one-command Docker setup for self-hosted Flagsmith",
+  "type": "module",
+  "bin": { "flagdeck": "bin/flagdeck.js" },
+  "engines": { "node": ">=18.3" },
+  "scripts": {
+    "start": "node bin/flagdeck.js",
+    "seed": "node bin/flagdeck.js seed",
+    "demo": "node bin/flagdeck.js demo",
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": ["flagsmith", "feature-flags", "tui", "cli", "self-hosted"],
+  "license": "BSD-3-Clause"
+}
+
