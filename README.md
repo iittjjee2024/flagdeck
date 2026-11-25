@@ -23,7 +23,7 @@ It uses the Management API (login token or organisation API key) and the public 
 ## Quick start
 
 ```bash
-git clone <this repo> && cd flagdeck
+git clone https://github.com/iittjjee2024/flagdeck.git && cd flagdeck
 docker compose up -d          # first run takes about 2 minutes while Flagsmith migrates
 node bin/flagdeck.js          # open the dashboard
 ```
