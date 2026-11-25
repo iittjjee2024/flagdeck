@@ -83,13 +83,9 @@ flagdeck experiment [results|simulate|reset] [--users N]
 
 Environment names match by prefix and ignore case (`prod` means `Production`).
 
-## Demo script (for the video)
+## Demo video
 
-1. `docker compose up -d`, then show the Flagsmith UI and the storefront side by side.
-2. `flagdeck`: point out that `new_checkout` and `ai_assistant` differ between environments (the `≠` column).
-3. Press `d` to show only drifted flags. Toggle `ai_assistant` in Development and watch the chat bubble appear on the storefront.
-4. Select `new_checkout` in Staging, press `>`. Confirm the Production prompt with `y` and watch the checkout button change when the storefront is set to Production.
-5. Show `flagdeck diff staging production` exiting 0 and how it fits in a CI pipeline.
+The recording script is in [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
 ## How Flagsmith is used
 
