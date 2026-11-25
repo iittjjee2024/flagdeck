@@ -59,6 +59,15 @@ export async function seed({ url, email = DEFAULTS.email, password = DEFAULTS.pa
       initial_value: f.value ?? undefined, type: 'STANDARD',
     });
   }
+  // Multivariate flag for the PayPal-button experiment: 50% show-paypal, remainder control.
+  if (!existing.some((x) => x.name === 'paypal_button')) {
+    log('creating experiment flag paypal_button');
+    await api.createFeature(project.id, {
+      name: 'paypal_button', description: 'Experiment: offer PayPal at checkout', default_enabled: true,
+      initial_value: 'control', type: 'MULTIVARIATE',
+      multivariate_options: [{ type: 'unicode', string_value: 'show-paypal', default_percentage_allocation: 50 }],
+    });
+  }
   const features = await api.features(project.id);
 
   for (const env of envs) {
@@ -86,3 +95,4 @@ export async function seed({ url, email = DEFAULTS.email, password = DEFAULTS.pa
   log(`ready: project ${project.id}, environments ${Object.keys(result.envs).join(', ')}`);
   return result;
 }
+

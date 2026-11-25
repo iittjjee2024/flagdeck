@@ -2,7 +2,7 @@ import { parseArgs } from 'node:util';
 import { Flagsmith, waitForApi } from './api.js';
 import { seed, DEFAULTS } from './seed.js';
 import { demo } from './demo.js';
-import { loadMatrix, isDrifted, diffEnvs, promote, setEnabled, resolveEnv } from './model.js';
+import { loadMatrix, isDrifted, diffEnvs, promote, setEnabled, resolveEnv, rollout } from './model.js';
 import { runTui } from './tui.js';
 
 const HELP = `flagdeck: terminal dashboard and tooling for self-hosted Flagsmith
@@ -15,6 +15,8 @@ Commands:
   toggle <flag> <env> [on|off] Flip a flag in one environment
   diff <from> <to>             Show flags that differ between two environments
   promote <from> <to> [flag…]  Copy state from one env to another (--dry-run, --yes for prod)
+  rollout <flag> <variant>     Serve one variation to 100% of an environment (--env, --yes for prod)
+  experiment [results|simulate|reset]  Read results from the shop experiment (--shop <url>)
   seed                         Create admin, org, project, envs and demo flags (idempotent)
   demo                         Run the demo storefront driven by the seeded flags
 
@@ -61,7 +63,7 @@ export async function main(argv) {
       url: { type: 'string' }, token: { type: 'string' }, project: { type: 'string' },
       email: { type: 'string' }, password: { type: 'string' }, port: { type: 'string' },
       wait: { type: 'boolean' }, drift: { type: 'boolean' }, json: { type: 'boolean' },
-      'dry-run': { type: 'boolean' }, yes: { type: 'boolean' }, 'write-env': { type: 'string' }, help: { type: 'boolean', short: 'h' },
+      'dry-run': { type: 'boolean' }, yes: { type: 'boolean' }, env: { type: 'string' }, shop: { type: 'string' }, users: { type: 'string' }, 'write-env': { type: 'string' }, help: { type: 'boolean', short: 'h' },
     },
   });
   const [cmd = 'tui', ...args] = positionals;
@@ -70,6 +72,8 @@ export async function main(argv) {
 
   if (cmd === 'seed') { await seed({ url, wait: o.wait, email: o.email, password: o.password, writeEnv: o['write-env'] }); return 0; }
   if (cmd === 'demo') { await demo({ url, port: Number(o.port ?? 3000), wait: o.wait, email: o.email, password: o.password }); return new Promise(() => {}); }
+
+  if (cmd === 'experiment') return experimentCmd(args[0] ?? 'results', o);
 
   if (o.wait) await waitForApi(url);
   const { api, projectId } = await connect(o);
@@ -117,6 +121,39 @@ export async function main(argv) {
     return 0;
   }
 
+  if (cmd === 'rollout') {
+    const [flagName, variant] = args;
+    if (!flagName || !variant) throw new Error('Usage: flagdeck rollout <flag> <variant> --env <env>');
+    const env = resolveEnv(matrix, o.env ?? 'Production');
+    const dry = o['dry-run'] || (isProd(env) && !o.yes);
+    const r = await rollout(api, matrix, projectId, flagName, variant, env, { dryRun: dry });
+    console.log(`${dry ? 'would set' : 'set'} ${r.flag} in ${r.env}: ${r.allocations.join(', ')}`);
+    if (dry && !o['dry-run']) console.log(`\n${env} is protected: re-run with --yes to apply.`);
+    return 0;
+  }
+
   console.error(`Unknown command "${cmd}"\n\n${HELP}`);
   return 2;
 }
+
+async function experimentCmd(sub, o) {
+  const base = (o.shop ?? process.env.FLAGDECK_SHOP ?? 'http://localhost:3000').replace(/\/+$/, '') + '/shop/api';
+  const call = (path, body) => fetch(base + path, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
+  if (sub === 'simulate') { const r = await call('/simulate', { users: Number(o.users ?? 500) }); console.log(`simulated ${r.simulated} users`); }
+  else if (sub === 'reset') { await call('/reset', {}); console.log('experiment data cleared'); return 0; }
+  else if (sub !== 'results') throw new Error('Usage: flagdeck experiment [results|simulate|reset] [--users N]');
+  const { results: r } = await call('/state');
+  const pc = (x) => `${(x * 100).toFixed(1)}%`;
+  console.log(`${r.experiment.flag}: ${r.experiment.hypothesis}\nmetric: ${r.experiment.metric.name} (${r.experiment.metric.event})\n`);
+  console.log('VARIANT'.padEnd(14) + 'EXPOSURES'.padEnd(11) + 'CONVERSIONS'.padEnd(13) + 'RATE'.padEnd(8) + 'DELTA'.padEnd(9) + 'WIN PROB');
+  for (const v of r.variants) {
+    console.log(v.name.padEnd(14) + String(v.exposures).padEnd(11) + String(v.conversions).padEnd(13) + pc(v.rate).padEnd(8)
+      + (v.delta === undefined ? '-' : `${v.delta >= 0 ? '+' : ''}${pc(v.delta)}`).padEnd(9) + (v.winProbability === undefined ? '-' : pc(v.winProbability)) + (v.collecting ? '  (collecting data)' : ''));
+  }
+  const ch = r.variants[1];
+  if (ch?.credibleInterval) console.log(`\n95% credible interval for lift: ${pc(ch.credibleInterval[0])} to ${pc(ch.credibleInterval[1])}${ch.conclusive ? '' : ' (inconclusive)'}`);
+  if (r.srm.mismatch) console.log(`WARNING: sample ratio mismatch (p=${r.srm.pValue.toExponential(1)}). Do not act on these results.`);
+  console.log(`\n${r.recommendation}`);
+  return 0;
+}
+

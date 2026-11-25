@@ -1,6 +1,7 @@
 import http from 'node:http';
 import { Flagsmith, waitForApi } from './api.js';
 import { seed, DEFAULTS } from './seed.js';
+import { shopHandler, ExperimentStore } from './shop.js';
 
 const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>Storefront (flagdeck demo)</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -47,8 +48,10 @@ export async function demo({ url, port = 3000, wait = false, email = DEFAULTS.em
   const { envs } = await seed({ url, email, password });
   const api = new Flagsmith({ url });
   const names = Object.keys(envs);
+  const shop = shopHandler({ api, envKey: envs.Production ?? Object.values(envs)[0], store: new ExperimentStore(process.env.FLAGDECK_DATA ?? 'data/shop.json') });
 
   const server = http.createServer(async (req, res) => {
+    if (await shop(req, res)) return;
     const u = new URL(req.url, 'http://x');
     if (u.pathname === '/api/flags') {
       try {
@@ -70,3 +73,4 @@ export async function demo({ url, port = 3000, wait = false, email = DEFAULTS.em
   console.log(`[demo] http://localhost:${port} (reading flags from ${url})`);
   return server;
 }
+

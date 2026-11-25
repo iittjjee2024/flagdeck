@@ -79,6 +79,10 @@ export class Flagsmith {
     return this.request('PATCH', `/api/v1/environments/${envKey}/featurestates/${id}/`, patch);
   }
 
+  putFeatureState(envKey, id, body) {
+    return this.request('PUT', `/api/v1/environments/${envKey}/featurestates/${id}/`, body);
+  }
+
   // ---- public Flags API (SDK-facing) ----
   sdkFlags(envKey) { return this.request('GET', '/api/v1/flags/', undefined, { 'X-Environment-Key': envKey, Authorization: '' }); }
   sdkIdentity(envKey, identifier, traits = []) {
@@ -98,3 +102,4 @@ export async function waitForApi(url, { timeoutMs = 180000, intervalMs = 2000 } 
     await new Promise((r) => setTimeout(r, intervalMs));
   }
 }
+

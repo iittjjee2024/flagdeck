@@ -68,3 +68,24 @@ export function resolveEnv(matrix, input) {
   if (!hit) throw new Error(`Unknown environment "${input}". Available: ${matrix.envs.map((e) => e.name).join(', ')}`);
   return hit.name;
 }
+
+/**
+ * Serve one variation of a multivariate flag to everyone in an environment (the "ship the winner" step).
+ * The control variation is the flag's own value, so rolling out control sets every option to 0%.
+ */
+export async function rollout(api, matrix, projectId, flagName, variant, envName, { dryRun = false } = {}) {
+  const env = matrix.envs.find((e) => e.name === envName);
+  const feature = (await api.features(projectId)).find((f) => f.name === flagName);
+  if (!feature) throw new Error(`Flag "${flagName}" not found`);
+  const options = feature.multivariate_options ?? [];
+  if (!options.length) throw new Error(`"${flagName}" is not a multivariate flag`);
+  const chosen = options.find((o) => o.string_value === variant);
+  const state = (await api.featureStates(env.key)).find((s) => s.feature === feature.id && !s.identity && !s.feature_segment);
+  const mv = options.map((o) => {
+    const existing = state.multivariate_feature_state_values.find((v) => v.multivariate_feature_option === o.id);
+    return { ...(existing ? { id: existing.id } : {}), multivariate_feature_option: o.id, percentage_allocation: chosen && o.id === chosen.id ? 100 : 0 };
+  });
+  if (!chosen && variant !== state.feature_state_value) throw new Error(`Unknown variation "${variant}". Options: ${options.map((o) => o.string_value).join(', ')}, ${state.feature_state_value} (control)`);
+  if (!dryRun) await api.putFeatureState(env.key, state.id, { ...state, enabled: true, multivariate_feature_state_values: mv });
+  return { flag: flagName, env: envName, variant, allocations: mv.map((m) => `${options.find((o) => o.id === m.multivariate_feature_option).string_value}=${m.percentage_allocation}%`) };
+}

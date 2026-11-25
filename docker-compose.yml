@@ -79,10 +79,12 @@ services:
     environment:
       FLAGSMITH_URL: http://flagsmith:8000
       PUBLIC_FLAGSMITH_URL: http://localhost:8000
+      FLAGDECK_DATA: /tmp/shop.json
     command: ['node', 'bin/flagdeck.js', 'demo', '--port', '3000', '--wait']
     ports:
       - 3000:3000
     depends_on:
       flagdeck-seed:
         condition: service_completed_successfully
+
 
