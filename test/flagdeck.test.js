@@ -77,3 +77,13 @@ test('render shows drift marker and drift-only filter', () => {
   const drift = render(state, { color: false });
   assert.doesNotMatch(drift, /\bb\b\s+●/);
 });
+
+test('hitTest maps terminal clicks onto matrix cells', async () => {
+  const { hitTest } = await import('../src/tui.js');
+  const state = { matrix: makeMatrix(), row: 0, col: 0, driftOnly: false };
+  assert.deepEqual(hitTest(state, 15, 5), { row: 0, col: 0 });
+  assert.deepEqual(hitTest(state, 15 + 14 * 2, 6), { row: 1, col: 2 });
+  assert.equal(hitTest(state, 15, 2), null);
+  assert.equal(hitTest(state, 2, 5), null);
+});
+

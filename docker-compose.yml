@@ -82,9 +82,10 @@ services:
       FLAGDECK_DATA: /tmp/shop.json
     command: ['node', 'bin/flagdeck.js', 'demo', '--port', '3000', '--wait']
     ports:
-      - 3000:3000
+      - 127.0.0.1:3000:3000
     depends_on:
       flagdeck-seed:
         condition: service_completed_successfully
+
 
 

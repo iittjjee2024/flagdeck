@@ -9,6 +9,23 @@ const strip = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
 const pad = (s, n) => s + ' '.repeat(Math.max(0, n - strip(s).length));
 const isProd = (name) => /prod/i.test(name);
 
+/** Column geometry shared by the renderer and mouse hit-testing. */
+export function layout(state) {
+  const flags = visibleFlags(state);
+  const nameW = Math.max(12, ...flags.map((f) => f.name.length)) + 2;
+  const colW = Math.max(...state.matrix.envs.map((e) => e.name.length), 8) + 3;
+  return { nameW, colW, firstRow: 5 };
+}
+
+/** Map a 1-based terminal click to a matrix cell, or null. */
+export function hitTest(state, x, y) {
+  const { nameW, colW, firstRow } = layout(state);
+  const row = y - firstRow;
+  const col = Math.floor((x - 1 - nameW) / colW);
+  if (row < 0 || row >= visibleFlags(state).length || col < 0 || col >= state.matrix.envs.length) return null;
+  return { row, col };
+}
+
 /** Pure renderer so it can be unit tested without a TTY. */
 export function render(state, { color = true } = {}) {
   const { matrix, row, col, driftOnly, message, confirm, url } = state;
@@ -44,7 +61,7 @@ export function render(state, { color = true } = {}) {
   }
   out.push('');
   out.push(confirm ? `${k.yellow}${confirm.text} [y/N]${k.reset}` : message ? `${k.cyan}${message}${k.reset}` : '');
-  out.push(`${k.gray}←↑↓→ move   space toggle   < > copy cell to prev/next env   d drift filter   r refresh   q quit${k.reset}`);
+  out.push(`${k.gray}←↑↓→ move   space or click toggle   < > copy cell to prev/next env   d drift filter   r refresh   q quit${k.reset}`);
   return out.join('\n');
 }
 
@@ -106,7 +123,7 @@ export async function runTui(api, { projectId, url }) {
   const draw = () => process.stdout.write('\x1b[H\x1b[2J' + render(state) + '\n');
   readline.emitKeypressEvents(process.stdin);
   process.stdin.setRawMode(true);
-  process.stdout.write('\x1b[?25l\x1b[?1049h');
+  process.stdout.write('\x1b[?25l\x1b[?1049h\x1b[?1000h\x1b[?1006h');
   let busy = false;
   const timer = setInterval(async () => {
     if (busy || state.confirm) return;
@@ -114,7 +131,19 @@ export async function runTui(api, { projectId, url }) {
     try { await refresh(state, api); } catch (e) { state.message = `refresh failed: ${e.message}`; }
     busy = false; draw();
   }, 4000);
-  const cleanup = () => { clearInterval(timer); process.stdout.write('\x1b[?1049l\x1b[?25h'); process.stdin.setRawMode(false); };
+  const cleanup = () => { clearInterval(timer); process.stdout.write('\x1b[?1006l\x1b[?1000l\x1b[?1049l\x1b[?25h'); process.stdin.setRawMode(false); };
+  process.stdin.on('data', async (buf) => {
+    const m = /\x1b\[<0;(\d+);(\d+)M/.exec(buf.toString());
+    if (!m || busy) return;
+    const hit = hitTest(state, Number(m[1]), Number(m[2]));
+    if (!hit) return;
+    busy = true;
+    try {
+      if (state.confirm) { state.confirm = null; state.message = 'cancelled'; }
+      else { state.row = hit.row; state.col = hit.col; await handleKey(state, api, 'space'); }
+    } catch (e) { state.message = `error: ${e.message}`; }
+    busy = false; draw();
+  });
   draw();
   await new Promise((resolve) => {
     process.stdin.on('keypress', async (str, k) => {
@@ -128,3 +157,4 @@ export async function runTui(api, { projectId, url }) {
   });
   process.stdin.pause();
 }
+

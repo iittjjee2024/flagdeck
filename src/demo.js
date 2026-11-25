@@ -1,6 +1,7 @@
 import http from 'node:http';
 import { Flagsmith, waitForApi } from './api.js';
 import { seed, DEFAULTS } from './seed.js';
+import { dashboardHandler } from './dashboard.js';
 import { shopHandler, ExperimentStore } from './shop.js';
 
 const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>Storefront (flagdeck demo)</title>
@@ -20,7 +21,7 @@ button.single{width:100%;font-size:1.1rem;padding:16px}
 small{opacity:.6}
 </style></head><body>
 <div id="banner"></div>
-<header><strong>Storefront</strong><label>Environment <select id="env"></select></label></header>
+<header><strong>Storefront</strong> <span><a href="/dashboard">Dashboard</a> � <a href="/shop">Experiment shop</a></span><label>Environment <select id="env"></select></label></header>
 <main>
 <h1 id="hero">…</h1>
 <div class="card"><p>Cart: 2 items · €48.00</p><div id="checkout"></div></div>
@@ -45,13 +46,14 @@ sel.onchange=tick;setInterval(tick,1500);tick();
 
 export async function demo({ url, port = 3000, wait = false, email = DEFAULTS.email, password = DEFAULTS.password, host = '0.0.0.0' }) {
   if (wait) await waitForApi(url);
-  const { envs } = await seed({ url, email, password });
-  const api = new Flagsmith({ url });
+  const { envs, project, token } = await seed({ url, email, password });
+  const api = new Flagsmith({ url, token });
   const names = Object.keys(envs);
   const shop = shopHandler({ api, envKey: envs.Production ?? Object.values(envs)[0], store: new ExperimentStore(process.env.FLAGDECK_DATA ?? 'data/shop.json') });
 
+  const dash = dashboardHandler({ api, projectId: project });
   const server = http.createServer(async (req, res) => {
-    if (await shop(req, res)) return;
+    if (await shop(req, res) || await dash(req, res)) return;
     const u = new URL(req.url, 'http://x');
     if (u.pathname === '/api/flags') {
       try {
@@ -73,4 +75,6 @@ export async function demo({ url, port = 3000, wait = false, email = DEFAULTS.em
   console.log(`[demo] http://localhost:${port} (reading flags from ${url})`);
   return server;
 }
+
+
 

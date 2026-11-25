@@ -14,6 +14,7 @@ Flagsmith's dashboard shows one environment at a time. Before a release you want
 | --- | --- |
 | `docker compose up` | Self-hosted Flagsmith (Postgres, API, task processor), a seed job that creates the admin, org, project, 3 environments and 5 flags, and a demo storefront at <http://localhost:3000> |
 | `flagdeck` (TUI) | A flags × environments matrix. Move with arrows, toggle with space, copy a cell to the neighbouring environment with `<` / `>`, filter to drifted flags with `d`. It refreshes every 4 seconds, so changes made in the Flagsmith UI show up. |
+| Web dashboard (`/dashboard`) | The same matrix in the browser. Every control works: toggle switches, `→` copy-to-next-environment buttons, drift filter, refresh, environment diff, promote differences, and a variation rollout form. Production changes ask for confirmation. |
 | `flagdeck diff/promote` | Show or apply the difference between two environments. Promoting to a production-like environment is a dry run unless you pass `--yes`. The TUI asks for `y/N` before touching Production. |
 | `flagdeck ls --json` | Machine-readable matrix for CI checks (`flagdeck diff staging production` exits 1 when they differ). |
 | Demo storefront | Reads flags through the Flagsmith SDK API. Toggle `dark_mode`, `new_checkout`, `ai_assistant`, `maintenance_banner` or edit `hero_headline` in the TUI and the page changes within 1.5 seconds. |
@@ -29,7 +30,11 @@ node bin/flagdeck.js          # open the dashboard
 ```
 
 - Flagsmith UI: <http://localhost:8000> (`admin@example.com` / `flagdeck-demo-1`)
-- Demo app: <http://localhost:3000>
+- Web dashboard: <http://localhost:3000/dashboard>
+- Demo storefront: <http://localhost:3000>
+- Sample shop with a PayPal-button test: <http://localhost:3000/shop>
+
+The demo app can change flags through the Management API, so Docker publishes it on `127.0.0.1` only. Do not expose port 3000 to a network.
 
 Install the command globally with `npm link`, then run `flagdeck`.
 
@@ -41,9 +46,9 @@ export FLAGSMITH_ORG_TOKEN=...        # organisation API key (or FLAGDECK_TOKEN 
 flagdeck --project 12
 ```
 
-## Experiment demo: PayPal button A/B test on self-hosted Flagsmith
+## Sample app: PayPal-button rollout on self-hosted Flagsmith
 
-Follows [Flagsmith's PayPal button example](https://docs.flagsmith.com/experimentation/example-paypal-button) end to end. Open the shop at `/shop` on the demo app (port 3000).
+A starter template for building a flag-driven app on your own Flagsmith, modelled on [Flagsmith's PayPal button example](https://docs.flagsmith.com/experimentation/example-paypal-button). Open the shop at `/shop` on the demo app (port 3000). Copy `src/shop.js` as a starting point for your own multivariate-flag app.
 
 ![Flagsmith Shop experiment](docs/shop.png)
 
@@ -95,7 +100,8 @@ Environment names match by prefix and ignore case (`prod` means `Production`).
 ## Tests
 
 ```bash
-node --test test/flagdeck.test.js
+node --test test/flagdeck.test.js test/experiment.test.js
+node test/smoke.mjs            # exercises every web dashboard action against a running stack
 ```
 
 Unit tests cover drift detection, promote (including dry run), production confirmation and rendering. The integration path (seed, toggle, promote, demo) is exercised by `docker compose up`.
