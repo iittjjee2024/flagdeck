@@ -8,6 +8,20 @@ Built for the Toggle Wars hackathon, Track 03: Build on Open Source Flagsmith.
 
 Flagsmith's dashboard shows one environment at a time. Before a release you want to answer "what is different between Staging and Production?" and fix it without clicking through every flag in every environment. Getting a local Flagsmith with realistic data to try this against also takes manual setup.
 
+## Screenshots
+
+| Terminal dashboard | Web dashboard |
+| --- | --- |
+| ![Terminal dashboard with drift column](docs/screenshots/09-terminal-dashboard.png) | ![Web dashboard with toggles, promote and rollout](docs/screenshots/02-web-dashboard.png) |
+| **Production asks first** | **Rolling out a variation** |
+| ![Production confirmation prompt in the terminal](docs/screenshots/08-terminal-prod-confirm.png) | ![Rollout result in the web dashboard](docs/screenshots/04-rollout-done.png) |
+| **Storefront driven by flags** | **Sample shop with a multivariate flag** |
+| ![Storefront](docs/screenshots/01-storefront.png) | ![Shop checkout with results panel and event log](docs/screenshots/06-shop-results.png) |
+
+One command brings it all up:
+
+![docker compose ps output](docs/screenshots/07-docker-compose.png)
+
 ## What it does
 
 | Piece | What you get |
